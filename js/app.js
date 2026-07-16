@@ -146,6 +146,12 @@
       $(id).addEventListener('click', (e) => { const c = e.target.closest('.recipe'); if (c) openRecipe(c.dataset.recipe); }));
     $('rec-mine-grid').addEventListener('click', (e) => { const c = e.target.closest('.rec-card'); if (c) openRecipe(c.dataset.recipe); });
     $('rec-search').addEventListener('input', (e) => { state.recFilter = e.target.value; renderRecipes(); });
+    // 「我的收藏」按食材分类切换（分段条会被 renderRecipes 重建，故用事件委托）
+    $('rec-mine-cat').addEventListener('click', (e) => {
+      const b = e.target.closest('.seg-btn'); if (!b) return;
+      recMineCat = b.dataset.cat;
+      renderRecipes();
+    });
     $('btn-add-recipe').addEventListener('click', () => openRecipeLink());
     $('recipe-edit-cancel').addEventListener('click', () => showSheet('sheet-recipe-edit', false));
     $('recipe-edit-form').addEventListener('submit', onRecipeEditSubmit);
@@ -691,6 +697,27 @@
       .replace(/(ml|g|克|个|片|根|勺|匙|杯|瓶|袋|盒|斤|两|把|颗|粒|张|块|只|尾|瓣|毫升|大匙|小勺)+/gi, '')
       .trim().split(/\s+/)[0] || line.trim();
   }
+  // 菜谱按食材归类（用于「我的收藏」分类切换）。基于食材名关键词推断「食材大类」，
+  // 关键词顺序即优先级：先匹配更具体的组，避免「鸡蛋」被「鸡」误归入肉荤等。
+  const RECIPE_GROUPS = {
+    '🍲 汤羹': ['汤', '羹', '煲', '炖'],
+    '🍰 甜品': ['蛋糕', '布丁', '奶茶', '糖水', '冰淇淋', '饼干', '巧克力', '甜'],
+    '🍚 主食': ['饭', '面', '粉', '饼', '馒头', '包子', '饺子', '面包', '意面', '吐司', '粥', '米'],
+    '🥚 蛋奶': ['鸡蛋', '蛋', '牛奶', '奶酪', '芝士', '奶油', '酸奶'],
+    '🐟 水产': ['鱼', '虾', '蟹', '贝', '鱿鱼', '带鱼', '三文鱼', '鳕鱼', '海带', '紫菜', '虾皮'],
+    '🥩 肉荤': ['肉', '牛肉', '猪肉', '羊肉', '排骨', '里脊', '培根', '火腿', '香肠', '鸡肉', '鸡翅', '鸡', '鸭', '鹅', '兔'],
+    '🥤 饮品': ['饮', '汁', '奶昔', '咖啡', '茶'],
+    '🥬 蔬菜': ['菜', '青菜', '西兰花', '菠菜', '白菜', '番茄', '土豆', '茄子', '黄瓜', '胡萝卜', '萝卜', '冬瓜', '南瓜', '玉米', '青椒', '洋葱', '韭菜', '芹菜', '生菜', '芦笋', '藕', '山药', '香菇', '豆腐', '豆', '豆芽']
+  };
+  function recipeGroup(r) {
+    const names = recipeIngredientNames(r);
+    if (!names.length) return '📦 其他';
+    for (const g in RECIPE_GROUPS) {
+      if (names.some(n => RECIPE_GROUPS[g].some(k => n.includes(k)))) return g;
+    }
+    return '📦 其他';
+  }
+  let recMineCat = '全部'; // 「我的收藏」当前选中的食材分类
   function recipeCookable(r) {
     const names = recipeIngredientNames(r);
     if (!names.length) return false;
@@ -735,9 +762,23 @@
     $('rec-now-list').innerHTML = nowList.length ? nowList.map(r => recipeRow(r, 'now')).join('')
       : '<p class="empty">冰箱里还凑不齐一道菜，去买点料吧～</p>';
 
-    // 我的收藏段 = 全部菜谱（可搜索 / 增删改）
+    // 我的收藏段 = 全部菜谱（可搜索 / 分类切换 / 增删改）
+    // 1) 动态分类条：按食材归类，统计每类数量
+    const counts = {};
+    state.recipes.forEach(r => { const g = recipeGroup(r); counts[g] = (counts[g] || 0) + 1; });
+    const groups = Object.keys(counts).sort();
+    const cats = ['全部', ...groups];
+    if (!cats.includes(recMineCat)) recMineCat = '全部';
+    const segBar = $('rec-mine-cat');
+    if (segBar) {
+      segBar.innerHTML = cats.map(c =>
+        `<button class="seg-btn${c === recMineCat ? ' active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}<span class="seg-count">${c === '全部' ? state.recipes.length : counts[c]}</span></button>`
+      ).join('');
+    }
+    // 2) 搜索 + 分类筛选
     const q = (state.recFilter || '').trim().toLowerCase();
-    const list = state.recipes.filter(r => {
+    let list = state.recipes.filter(r => {
+      if (recMineCat !== '全部' && recipeGroup(r) !== recMineCat) return false;
       if (!q) return true;
       if (r.name.toLowerCase().includes(q)) return true;
       return recipeIngredientNames(r).some(n => n.toLowerCase().includes(q));
@@ -746,9 +787,9 @@
     if (list.length) {
       grid.innerHTML = list.map(r => {
         const cover = (r.images && r.images.length) ? `<img src="${r.images[0]}" alt="">` : `<div class="rec-cover icon">${r.ico || '🍲'}</div>`;
-        return `<div class="rec-card" data-recipe="${r.id}">${cover}<div class="rec-card-name">${escapeHtml(r.name)}</div></div>`;
+        return `<div class="rec-card" data-recipe="${r.id}">${cover}<div class="rec-card-name">${escapeHtml(r.name)}</div><div class="rec-card-cat">${escapeHtml(recipeGroup(r))}</div></div>`;
       }).join('');
-    } else grid.innerHTML = '<p class="empty">没有匹配的菜谱</p>';
+    } else grid.innerHTML = '<p class="empty">这个分类下还没有菜谱</p>';
   }
 
   // ---------- 菜谱详情（统一从收藏读取，均可编辑/删除）----------

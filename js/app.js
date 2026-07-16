@@ -1021,10 +1021,7 @@
     const date = todayStr();
     const prog = dayProgress(date);
     const covered = prog.cover; // 营养素 key -> [来源显示名]
-    // 维度总数 / 已覆盖数（基于 DRIs 全量，作为底层逻辑）
-    const total = DRI_CATS.reduce((s, c) => s + (Nutri.DRIS[c] ? Nutri.DRIS[c].length : 0), 0);
-    const coveredCount = DRI_CATS.reduce((s, c) => s + (Nutri.DRIS[c] || []).filter(d => covered[d.name]).length, 0);
-    const pct = total ? Math.round(coveredCount / total * 100) : 0;
+    const pct = nutriScore(covered);
     $('nutri-score').textContent = prog.foods.length ? pct + ' 分' : '—';
     const label = !prog.foods.length ? '记录后评分' : pct >= 80 ? '营养均衡 👍' : pct >= 50 ? '基本够 😐' : '还需努力 💪';
     $('nutri-score-label').textContent = label;
@@ -1051,11 +1048,16 @@
     const tip = foodSuggestions(items);
     wb.innerHTML = `<div class="dri-group"><div class="dri-group-h warn">${cat} · 还缺 ${items.length}</div><div class="chips">${chips}</div>${tip ? `<div class="dri-src-tip">建议多吃：${escapeHtml(tip)}</div>` : ''}</div>`;
   }
-  // 仅渲染「今日营养进度」中当前选中维度（nutriProgCat）的一项，配合分段切换
-  function renderNutriProgress(covered) {
-    const cat = nutriProgCat;
+  // 营养维度评分：已覆盖维度 / DRIs 全量维度
+  function nutriScore(covered) {
+    const total = DRI_CATS.reduce((s, c) => s + (Nutri.DRIS[c] ? Nutri.DRIS[c].length : 0), 0);
+    const coveredCount = DRI_CATS.reduce((s, c) => s + (Nutri.DRIS[c] || []).filter(d => covered[d.name]).length, 0);
+    return total ? Math.round(coveredCount / total * 100) : 0;
+  }
+  // 渲染「营养进度」HTML（给定已覆盖维度 + 当前维度），供主页与「按日详情」复用
+  function progressHTML(covered, cat) {
     const items = (Nutri.DRIS[cat] || []);
-    if (!items.length) { $('nutri-progress').innerHTML = '<p class="empty">该分类暂无数据</p>'; return; }
+    if (!items.length) return '<p class="empty">该分类暂无数据</p>';
     const done = items.filter(d => covered[d.name]).length;
     const rows = items.map(d => {
       const ico = (Nutri.NUTRIENTS[d.name] && Nutri.NUTRIENTS[d.name].ico) || '•';
@@ -1066,26 +1068,94 @@
       }
       return `<div class="nutri-dim miss"><span class="nutri-ico">${ico}</span><span class="nutri-name">${escapeHtml(d.name)}</span><div class="nutri-src">未摄入</div></div>`;
     }).join('');
-    $('nutri-progress').innerHTML = `<div class="dri-group"><div class="dri-group-h">${cat} · 已摄入 ${done}/${items.length}</div>${rows}</div>`;
+    return `<div class="dri-group"><div class="dri-group-h">${cat} · 已摄入 ${done}/${items.length}</div>${rows}</div>`;
   }
-  // 渲染「管理饮食记录」弹层（今日记录模块移出主页后，仍可在弹层删除/编辑）
+  // 仅渲染「今日营养进度」中当前选中维度（nutriProgCat）的一项，配合分段切换
+  function renderNutriProgress(covered) {
+    $('nutri-progress').innerHTML = progressHTML(covered, nutriProgCat);
+  }
+  // 日期格式化：YYYY-MM-DD → M月D日 · 周X
+  function fmtDate(d) {
+    const dt = new Date(d + 'T00:00:00');
+    const wd = ['日', '一', '二', '三', '四', '五', '六'][dt.getDay()];
+    return `${dt.getMonth() + 1}月${dt.getDate()}日 · 周${wd}`;
+  }
+  // 渲染「管理饮食记录」弹层：按「月 → 日」分组（不按餐展开）
   async function renderNutriManage() {
     const list = $('nutri-manage-list');
     if (!list) return;
-    const recs = state.nutrition.slice().sort((a, b) => (b.date + (b.ts || 0)).localeCompare(a.date + (a.ts || 0)));
+    const recs = state.nutrition.slice();
     if (!recs.length) { list.innerHTML = '<p class="empty">还没有任何饮食记录</p>'; return; }
-    list.innerHTML = recs.map(r => {
+    // 按日聚合
+    const byDay = {};
+    recs.forEach(r => { (byDay[r.date] = byDay[r.date] || []).push(r); });
+    const days = Object.keys(byDay).sort((a, b) => b.localeCompare(a));
+    // 按「月」归集日
+    const months = {};
+    days.forEach(d => { const m = d.slice(0, 7); (months[m] = months[m] || []).push(d); });
+    const monthKeys = Object.keys(months).sort((a, b) => b.localeCompare(a));
+    let html = '';
+    monthKeys.forEach(m => {
+      const [yy, mm] = m.split('-');
+      html += `<div class="manage-month"><div class="manage-month-h">${yy}年${Number(mm)}月</div>`;
+      months[m].forEach(d => {
+        const dayRecs = byDay[d].slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        const prog = dayProgress(d);
+        const pct = nutriScore(prog.cover);
+        html += `<button class="manage-day" data-day="${d}">
+          <div class="manage-day-main"><b>${fmtDate(d)}</b> <span class="muted">${dayRecs.length} 餐</span></div>
+          <div class="manage-day-score">${prog.foods.length ? pct + ' 分' : '—'}</div>
+        </button>`;
+      });
+      html += `</div>`;
+    });
+    list.innerHTML = html;
+    list.querySelectorAll('[data-day]').forEach(b => b.addEventListener('click', () => openNutriDayDetail(b.dataset.day)));
+  }
+  // 点进「某日」：展示当日营养进度（维生素/矿物质/宏量 分段）+ 当日各餐（可编辑/删除）
+  function openNutriDayDetail(date) {
+    const list = $('nutri-manage-list');
+    const recs = state.nutrition.filter(r => r.date === date).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    const prog = dayProgress(date);
+    const covered = prog.cover;
+    const pct = nutriScore(covered);
+    let html = `<button class="manage-back" id="nutri-day-back">← 返回</button>`;
+    html += `<div class="manage-day-title">${fmtDate(date)} 的营养进度</div>`;
+    html += `<div class="manage-day-score-big">${prog.foods.length ? pct + ' 分' : '—'}</div>`;
+    html += `<div class="seg small" id="nutri-day-seg">
+      <button class="seg-btn active" data-cat="维生素">维生素</button>
+      <button class="seg-btn" data-cat="矿物质">矿物质</button>
+      <button class="seg-btn" data-cat="宏量">宏量</button>
+    </div>`;
+    html += `<div id="nutri-day-progress"></div>`;
+    html += `<div class="manage-day-meals"><h3>当日记录（${recs.length} 餐）</h3>`;
+    if (!recs.length) html += '<p class="empty">这一天还没有记录</p>';
+    recs.forEach(r => {
       const mealIco = { 早餐: '🌅', 午餐: '☀️', 晚餐: '🌙', 加餐: '🍎' }[r.meal] || '🍽️';
       const time = r.ts ? new Date(r.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
       const nFoods = (r.foods || []).length;
-      return `<div class="manage-row">
-        <div class="manage-info"><b>${mealIco} ${escapeHtml(r.meal)}</b> <span class="muted">${escapeHtml(r.date)}${time ? ' ' + time : ''}</span><div class="muted small">${escapeHtml(r.raw)} · 含 ${nFoods} 类食材</div></div>
+      html += `<div class="manage-row">
+        <div class="manage-info"><b>${mealIco} ${escapeHtml(r.meal)}</b> <span class="muted">${time}</span><div class="muted small">${escapeHtml(r.raw)} · 含 ${nFoods} 类食材</div></div>
         <div class="manage-acts">
           <button data-nutri-edit="${r.id}" title="编辑">✏️</button>
           <button data-nutri-del2="${r.id}" title="删除">🗑️</button>
         </div>
       </div>`;
-    }).join('');
+    });
+    html += `</div>`;
+    list.innerHTML = html;
+    // 当日营养进度：分段切换
+    let dayCat = '维生素';
+    const seg = $('nutri-day-seg');
+    const renderDayProg = () => { $('nutri-day-progress').innerHTML = progressHTML(covered, dayCat); };
+    renderDayProg();
+    seg.querySelectorAll('.seg-btn').forEach(b => b.addEventListener('click', () => {
+      seg.querySelectorAll('.seg-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      dayCat = b.dataset.cat;
+      renderDayProg();
+    }));
+    $('nutri-day-back').addEventListener('click', renderNutriManage);
     list.querySelectorAll('[data-nutri-edit]').forEach(b => b.addEventListener('click', () => {
       showSheet('sheet-nutri-manage', false);
       openNutriSheet(b.dataset.nutriEdit);
@@ -1094,8 +1164,7 @@
       if (!confirm('删除这条饮食记录？')) return;
       await DB.deleteNutrition(b.dataset.nutriDel2);
       state.nutrition = await DB.getAllNutrition();
-      renderNutriManage();
-      renderNutrition();
+      openNutriDayDetail(date); // 刷新当日视图
     }));
   }
   function openNutriSheet(id, prefill) {

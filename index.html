@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#2f7d4f">
+  <title>物品管家 · 家用库存助手</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="appbar">
+    <div class="brand">📦 物品管家</div>
+    <div class="appbar-actions">
+      <button id="btn-scan" class="icon-btn" title="扫码">📷</button>
+      <button id="btn-voice" class="icon-btn" title="语音">🎙️</button>
+      <button id="btn-batch" class="icon-btn" title="小票批量">🧾</button>
+      <button id="btn-photo" class="icon-btn" title="拍照">🖼️</button>
+      <input type="file" id="file-photo" accept="image/*" capture="environment" hidden>
+    </div>
+  </header>
+
+  <main>
+    <!-- 首页 -->
+    <section id="view-home" class="view active">
+      <!-- 封面 -->
+      <div class="hero">
+        <div class="hero-top">
+          <div>
+            <div class="hero-date" id="hero-date"></div>
+            <div class="hero-title">物品管家</div>
+          </div>
+          <div class="hero-avatar">📦</div>
+        </div>
+        <div class="hero-summary" id="hero-summary">今天一切正常，囤货无忧 ✓</div>
+      </div>
+
+      <!-- 概览 KPI -->
+      <div class="grid2">
+        <div class="kpi clickable" data-jump="total"><span class="kpi-ico">📦</span><b id="stat-total">0</b><span>物品总数</span></div>
+        <div class="kpi"><span class="kpi-ico">💰</span><b id="stat-value">¥0</b><span>库存总值</span></div>
+        <div class="kpi red clickable" data-jump="expired"><span class="kpi-ico">⛔</span><b id="stat-expired">0</b><span>已过期</span></div>
+        <div class="kpi orange clickable" data-jump="expiring"><span class="kpi-ico">⏰</span><b id="stat-expiring">0</b><span>临近过期</span></div>
+        <div class="kpi yellow clickable" data-jump="low"><span class="kpi-ico">📉</span><b id="stat-low">0</b><span>库存不足</span></div>
+        <div class="kpi"><span class="kpi-ico">🗑️</span><b id="stat-waste">¥0</b><span>累计浪费</span></div>
+      </div>
+
+      <div id="home-alerts" class="alerts"></div>
+
+      <!-- 待购 -->
+      <div id="home-shopping" class="card-block" style="display:none">
+        <h2>🛒 待购清单 <span id="home-shop-count" class="muted"></span></h2>
+        <div id="home-shop-list" class="list"></div>
+        <button id="home-shop-go" class="link-btn">查看 / 编辑全部 →</button>
+      </div>
+
+      <!-- 日历同步 -->
+      <div id="home-cal" class="card-block" style="display:none">
+        <h2>📅 到期日 · 日历同步</h2>
+        <p class="tip" id="home-cal-info"></p>
+        <button id="home-cal-btn" class="block-btn outline">⬇️ 更新并下载日历(.ics)</button>
+      </div>
+
+      <div class="card-block">
+        <h2>分类分布</h2>
+        <canvas id="chart-cat" class="chart"></canvas>
+      </div>
+      <p class="tip">💡 点底部「物品」管理清单，「提醒」看临期与补货，「菜谱」看临期推荐与收藏，「统计」看浪费趋势。手机浏览器里点 ⋯ →「添加到主屏幕」即可当 APP 用。</p>
+    </section>
+
+    <!-- 物品 -->
+    <section id="view-items" class="view">
+      <div class="filters">
+        <select id="filter-cat"></select>
+        <select id="filter-member"></select>
+        <input id="search-q" type="search" placeholder="搜索名称…">
+      </div>
+      <div id="status-chips" class="chips-row"></div>
+      <div id="items-list" class="list"></div>
+    </section>
+
+    <!-- 提醒 -->
+    <section id="view-reminders" class="view">
+      <div class="card-block"><p class="tip">🔔 已过期=红，临近过期(自定义提前天数)=橙，库存不足=黄。点 🛒 可一键加入待购清单。</p></div>
+      <div id="reminders-list" class="list"></div>
+    </section>
+
+    <!-- 统计 -->
+    <section id="view-stats" class="view">
+      <div class="card-block">
+        <h2>分类占比</h2>
+        <canvas id="chart-cat2" class="chart"></canvas>
+      </div>
+      <div class="card-block">
+        <h2>浪费金额趋势（近6个月）</h2>
+        <canvas id="chart-waste" class="chart"></canvas>
+        <div class="kpi-row">
+          <span>累计浪费 <b id="stats-waste-total">¥0</b></span>
+          <span>丢弃次数 <b id="stats-waste-count">0</b></span>
+        </div>
+      </div>
+      <div class="card-block">
+        <h2>浪费分类</h2>
+        <canvas id="chart-waste-cat" class="chart"></canvas>
+      </div>
+      <div class="card-block">
+        <h2>🛒 待购清单</h2>
+        <div id="shopping-list" class="list"></div>
+        <button id="shopping-clear" class="link-btn">清空待购</button>
+      </div>
+    </section>
+
+    <!-- 菜谱 -->
+    <section id="view-recipes" class="view">
+      <div class="seg">
+        <button class="seg-btn active" data-seg="recommend">🍳 推荐</button>
+        <button class="seg-btn" data-seg="mine">📚 我的收藏</button>
+      </div>
+      <div id="rec-seg-recommend">
+        <div class="card-block">
+          <h2>⏰ 临期优先（按紧急度）</h2>
+          <div id="rec-urgent-list" class="list"></div>
+        </div>
+        <div class="card-block">
+          <h2>✅ 现在就能做（食材齐全）</h2>
+          <div id="rec-now-list" class="list"></div>
+        </div>
+      </div>
+      <div id="rec-seg-mine" style="display:none">
+        <h2>🍽️ 全部菜谱</h2>
+        <input id="rec-search" class="rec-search" type="search" placeholder="🔍 搜索菜名 / 食材…">
+        <button id="btn-add-recipe" class="block-btn">＋ 新增 / 从链接保存菜谱</button>
+        <div id="rec-mine-grid" class="rec-grid"></div>
+      </div>
+    </section>
+
+    <!-- 营养 -->
+    <section id="view-nutrition" class="view">
+      <button id="btn-add-meal" class="block-btn primary">＋ 记录一餐</button>
+      <button id="btn-manage-meal" class="link-btn">🗂️ 管理饮食记录</button>
+      <div class="card-block nutri-summary">
+        <div class="nutri-score"><b id="nutri-score">—</b><span id="nutri-score-label">今日评分</span></div>
+        <div class="nutri-kcal">
+          <div class="big" id="nutri-kcal">—</div>
+          <div class="muted">今日热量估算(kcal)</div>
+          <div class="nutri-tip" id="nutri-tip">记录饮食，看看今天吃够没有</div>
+        </div>
+      </div>
+      <div class="card-block">
+        <h2>📊 今日营养进度</h2>
+        <div class="seg small" id="nutri-prog-seg">
+          <button class="seg-btn active" data-cat="维生素">维生素</button>
+          <button class="seg-btn" data-cat="矿物质">矿物质</button>
+          <button class="seg-btn" data-cat="宏量">宏量</button>
+        </div>
+        <div id="nutri-progress" class="list"></div>
+      </div>
+      <div class="card-block" id="nutri-warn-block">
+        <h2>💡 还该补充什么</h2>
+        <div class="seg small" id="nutri-warn-seg">
+          <button class="seg-btn active" data-cat="维生素">维生素</button>
+          <button class="seg-btn" data-cat="矿物质">矿物质</button>
+          <button class="seg-btn" data-cat="宏量">宏量</button>
+        </div>
+        <div id="nutri-warn" class="list"></div>
+      </div>
+      <p class="tip">💡 记录方式：直接写「中午吃了西兰花炒虾仁」，或用 🎙️ 语音、📷 拍照。App 会自动识别食材并分析营养，按「维生素 / 矿物质 / 宏量」提醒你今天还缺什么。</p>
+    </section>
+
+    <!-- 我的 -->
+    <section id="view-me" class="view">
+      <div class="card-block">
+        <h2>设置</h2>
+        <label class="row">提前提醒天数
+          <input id="set-advance" type="number" min="0" max="60" value="3"> 天</label>
+        <label class="row">主题
+          <select id="set-theme"><option value="light">浅色</option><option value="dark">深色</option></select></label>
+        <label class="row">开启通知
+          <input id="set-notify" type="checkbox" checked></label>
+        <label class="row">当前使用者
+          <select id="set-member"></select></label>
+        <label class="row">日历自动同步
+          <input id="set-autocal" type="checkbox"></label>
+        <p class="tip">开启后，物品到期日变动会提醒你重新导出日历。真正的「系统日历实时自动显示提醒」需后端订阅（可后续升级）。</p>
+        <label class="row" style="display:block">菜谱抓取代理(选填)
+          <input id="set-proxy" placeholder="https://你的代理/parse" style="width:100%;margin-top:6px"></label>
+        <p class="tip">选填。配置后可一键抓取小红书等链接的标题与图片（需自备后端代理）。不填则走手动填写 / 智能提取，功能同样可用。</p>
+        <div class="row">家庭成员 <span id="members-list" class="chips"></span>
+          <button id="btn-add-member" class="mini">+ 添加</button></div>
+        <p class="tip">当前共记录 <b id="me-count">0</b></p>
+      </div>
+      <div class="card-block">
+        <h2>数据</h2>
+        <button id="btn-export" class="block-btn">⬇️ 导出备份(JSON)</button>
+        <label class="block-btn outline">⬆️ 导入备份
+          <input id="file-import" type="file" accept="application/json" hidden></label>
+        <button id="btn-sample" class="block-btn">✨ 加载示例数据</button>
+        <button id="btn-cal" class="block-btn outline">📅 导出到期日到日历(.ics)</button>
+        <button id="btn-stats" class="block-btn outline">📊 打开统计</button>
+        <button id="btn-test-notify" class="block-btn outline">🔔 测试通知</button>
+        <button id="btn-clear-all" class="block-btn danger">🗑️ 清空全部数据</button>
+      </div>
+      <div class="card-block">
+        <h2>🥗 营养目标</h2>
+        <div class="two">
+          <label>性别<select id="nutri-gender"><option value="女">女</option><option value="男">男</option></select></label>
+          <label>年龄<input id="nutri-age" type="number" min="1" max="120" value="30"></label>
+        </div>
+        <div class="two">
+          <label>身高(cm)<input id="nutri-height" type="number" min="80" max="230" value="165"></label>
+          <label>体重(kg)<input id="nutri-weight" type="number" min="20" max="250" value="55"></label>
+        </div>
+        <label class="row">健康目标
+          <select id="nutri-goal"><option value="维持">维持健康</option><option value="减脂">减脂</option><option value="增肌">增肌</option></select></label>
+        <p class="tip" id="nutri-target-tip"></p>
+      </div>
+      <div class="about">
+        <p>物品管家 · 本地优先的家庭库存助手</p>
+        <p class="muted">数据保存在本机浏览器(IndexedDB)，关掉再开不会丢。换手机/清缓存前，请先「导出备份」再导入。多端云同步需后端服务，可后续扩展。</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- 底部导航 -->
+  <nav class="tabbar">
+    <button class="nav-btn active" data-view="home"><span>🏠</span>首页</button>
+    <button class="nav-btn" data-view="items"><span>📋</span>物品</button>
+    <button class="nav-btn" data-view="reminders"><span>🔔</span>提醒</button>
+    <button class="nav-btn fab" id="fab-add">＋</button>
+    <button class="nav-btn" data-view="recipes"><span>🍲</span>菜谱</button>
+    <button class="nav-btn" data-view="nutrition"><span>🥗</span>营养</button>
+    <button class="nav-btn" data-view="me"><span>👤</span>我的</button>
+  </nav>
+
+  <!-- 物品表单 -->
+  <div id="sheet-item" class="sheet">
+    <div class="sheet-head"><h2 id="item-title">添加物品</h2><button id="item-cancel" class="x">✕</button></div>
+    <form id="item-form" class="sheet-body">
+      <label>名称 *<input id="item-name" required placeholder="如：纯牛奶"></label>
+      <div class="two"><label>分类<select id="item-cat"></select></label>
+        <label>使用者<select id="item-member"></select></label></div>
+      <label>存放位置<input id="item-loc" list="loc-list" placeholder="如：冰箱-冷藏室"><datalist id="loc-list"></datalist></label>
+      <div class="two">
+        <label>数量<input id="item-qty" type="number" min="0" step="0.5" value="1"></label>
+        <label>单位<select id="item-unit"></select></label>
+      </div>
+      <label>低库存提醒阈值（≤此数量提醒）<input id="item-low" type="number" min="0" step="0.5" placeholder="如：1"></label>
+      <div class="two">
+        <label>开封日期<input id="item-open" type="date"></label>
+        <label>开封后保质期(天)<input id="item-shelf" type="number" min="0" placeholder="如：7"></label>
+      </div>
+      <div class="two">
+        <label>到期日<input id="item-expiry" type="date"></label>
+        <label>条码/编号<input id="item-barcode" placeholder="扫码或手填"></label>
+      </div>
+      <label>价格(¥)<input id="item-price" type="number" min="0" step="0.01" placeholder="选填，用于统计浪费金额"></label>
+      <label>备注<input id="item-note" placeholder="选填"></label>
+      <img id="item-photo-preview" class="photo-preview" alt="照片" style="display:none">
+      <div class="sheet-actions">
+        <button type="button" id="item-del" class="block-btn danger" style="display:none">删除</button>
+        <button type="submit" class="block-btn primary">保存</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 批量录入 -->
+  <div id="sheet-batch" class="sheet">
+    <div class="sheet-head"><h2>小票/批量录入</h2><button id="batch-cancel" class="x">✕</button></div>
+    <form id="batch-form" class="sheet-body">
+      <p class="tip">每行一件，格式：<b>名称 数量 分类 位置</b>（数量/分类/位置可省略，自动识别）。<br>例：<br>纯牛奶 2 盒 冰箱-冷藏室<br>抽纸 1 提 卫生间</p>
+      <textarea id="batch-text" rows="8" placeholder="在此粘贴多行…"></textarea>
+      <button type="submit" class="block-btn primary">批量添加</button>
+    </form>
+  </div>
+
+  <!-- 扫码 -->
+  <div id="sheet-scan" class="sheet">
+    <div class="sheet-head"><h2>扫码识别</h2><button id="scan-close" class="x">✕</button></div>
+    <div class="sheet-body center">
+      <video id="scan-video" playsinline></video>
+      <p class="tip">将条码对准取景框…</p>
+    </div>
+  </div>
+
+  <!-- 菜谱详情 -->
+  <div id="sheet-recipe" class="sheet">
+    <div class="sheet-head"><h2 id="recipe-title">菜谱</h2><button id="recipe-close" class="x">✕</button></div>
+    <div class="sheet-body" id="recipe-body"></div>
+  </div>
+
+  <!-- 保存菜谱（手动/编辑） -->
+  <div id="sheet-recipe-edit" class="sheet">
+    <div class="sheet-head"><h2 id="recipe-edit-title">保存菜谱</h2><button id="recipe-edit-cancel" class="x">✕</button></div>
+    <form id="recipe-edit-form" class="sheet-body">
+      <label>菜名 *<input id="r-name" required placeholder="如：奶香烤吐司"></label>
+      <label>来源链接<input id="r-source" placeholder="小红书/抖音链接（选填）"></label>
+      <label>食材（每行一个，可带用量）<textarea id="r-ing" rows="4" placeholder="鸡蛋 2个&#10;牛奶 100ml&#10;吐司 2片"></textarea></label>
+      <label>步骤（每行一步）<textarea id="r-steps" rows="5" placeholder="1. 吐司抹牛奶&#10;2. 烤箱180度10分钟"></textarea></label>
+      <label>标签（逗号分隔，选填）<input id="r-tags" placeholder="早餐,烘焙"></label>
+      <label>图片（可多张，自动压缩）<input id="r-imgs" type="file" accept="image/*" multiple></label>
+      <div id="r-img-preview" class="img-grid"></div>
+      <div class="sheet-actions">
+        <button type="button" id="recipe-edit-del" class="block-btn danger" style="display:none">删除</button>
+        <button type="submit" class="block-btn primary">保存</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 从链接保存 -->
+  <div id="sheet-recipe-link" class="sheet">
+    <div class="sheet-head"><h2>从链接保存菜谱</h2><button id="recipe-link-cancel" class="x">✕</button></div>
+    <form id="recipe-link-form" class="sheet-body">
+      <p class="tip">粘贴小红书/抖音等分享链接。若你在「我的」配置了抓取代理，将自动提取标题与图片；否则可手动填写，或用下方「智能提取」粘贴笔记正文自动拆分食材/步骤。</p>
+      <label>分享链接<input id="r-link" placeholder="https://www.xiaohongshu.com/..."></label>
+      <button type="submit" class="block-btn primary">获取菜谱</button>
+      <div id="r-link-result"></div>
+      <hr class="sep">
+      <label>智能提取：粘贴笔记正文（自动识别食材与步骤）<textarea id="r-paste" rows="6" placeholder="把小红书笔记里的文字复制到这里…"></textarea></label>
+      <button type="button" id="r-extract" class="block-btn outline">智能拆分食材/步骤</button>
+    </form>
+  </div>
+
+  <!-- 记录一餐 -->
+  <div id="sheet-nutri" class="sheet">
+    <div class="sheet-head"><h2 id="nutri-title">记录一餐</h2><button id="nutri-cancel" class="x">✕</button></div>
+    <form id="nutri-form" class="sheet-body">
+      <div class="two">
+        <label>餐别
+          <select id="nutri-meal">
+            <option value="早餐">早餐</option>
+            <option value="午餐" selected>午餐</option>
+            <option value="晚餐">晚餐</option>
+            <option value="加餐">加餐</option>
+          </select>
+        </label>
+        <label>日期<input id="nutri-date" type="date"></label>
+      </div>
+      <label>吃了什么 *<textarea id="nutri-text" rows="3" placeholder="如：西兰花炒虾仁、米饭、一碗酸奶"></textarea></label>
+      <div class="btn-row">
+        <button type="button" id="nutri-voice" class="icon-btn" title="语音">🎙️</button>
+        <button type="button" id="nutri-photo" class="icon-btn" title="拍照">🖼️</button>
+        <button type="button" id="nutri-scan" class="icon-btn" title="扫码">📷</button>
+        <button type="button" id="nutri-parse" class="block-btn outline small">✨ 智能解析</button>
+      </div>
+      <input type="file" id="nutri-file" accept="image/*" capture="environment" hidden>
+      <div id="nutri-preview" class="nutri-preview"></div>
+      <img id="nutri-photo-preview" class="photo-preview" alt="照片" style="display:none">
+      <div class="sheet-actions">
+        <button type="button" id="nutri-del" class="block-btn danger" style="display:none">删除</button>
+        <button type="submit" class="block-btn primary">保存记录</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 管理饮食记录 -->
+  <div id="sheet-nutri-manage" class="sheet">
+    <div class="sheet-head"><h2>管理饮食记录</h2><button id="nutri-manage-cancel" class="x">✕</button></div>
+    <div class="sheet-body" id="nutri-manage-list"></div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="./js/knowledge.js"></script>
+  <script src="./js/db.js"></script>
+  <script src="./js/recipes.js"></script>
+  <script src="./js/nutrition.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

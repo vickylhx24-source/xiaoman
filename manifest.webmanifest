@@ -1,6 +1,6 @@
 {
-  "name": "物品管家 · 家用库存助手",
-  "short_name": "物品管家",
+  "name": "小满 · 家用库存助手",
+  "short_name": "小满",
   "description": "零食、生鲜、日用品一站式库存管理：智能录入、开封/到期预警、低库存提醒、浪费统计。",
   "start_url": "./index.html",
   "scope": "./",

@@ -1,4 +1,4 @@
-/* 物品管家 · 家用库存助手 —— 主逻辑 */
+/* 小满 · 家用库存助手 —— 主逻辑 */
 (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
@@ -1349,7 +1349,7 @@
 
   // ---------- 导出到期日到日历(.ics) ----------
   function exportCalendar() {
-    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//物品管家//ZH', 'CALSCALE:GREGORIAN'];
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//小满//ZH', 'CALSCALE:GREGORIAN'];
     let n = 0;
     state.items.forEach(it => {
       const s = statusOf(it);
@@ -1366,7 +1366,7 @@
     lines.push('END:VCALENDAR');
     if (!n) { toast('没有带到期日的物品'); return; }
     const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '物品管家-到期日.ics'; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '小满-到期日.ics'; a.click();
     URL.revokeObjectURL(a.href);
     toast('已导出 ' + n + ' 条到期日到日历文件');
   }
@@ -1496,9 +1496,9 @@
     const body = `已过期 ${expired} · 临期 ${expiring} · 库存不足 ${low}`;
     try {
       const reg = await navigator.serviceWorker.ready;
-      reg.showNotification('物品管家 · 今日提醒', { body, icon: './icon.svg', tag: 'ik-daily', renotify: true });
+      reg.showNotification('小满 · 今日提醒', { body, icon: './icon.svg', tag: 'ik-daily', renotify: true });
     } catch (e) {
-      new Notification('物品管家 · 今日提醒', { body });
+      new Notification('小满 · 今日提醒', { body });
     }
   }
   function testNotify() {
@@ -1510,8 +1510,8 @@
   }
   function fireTest() {
     const reg = navigator.serviceWorker.ready;
-    reg.then(r => r.showNotification('物品管家 · 测试通知', { body: '这是一条测试提醒，到期/低库存会自动推送', icon: './icon.svg' }))
-      .catch(() => new Notification('物品管家 · 测试通知', { body: '测试' }));
+    reg.then(r => r.showNotification('小满 · 测试通知', { body: '这是一条测试提醒，到期/低库存会自动推送', icon: './icon.svg' }))
+      .catch(() => new Notification('小满 · 测试通知', { body: '测试' }));
   }
 
   // ---------- 导出/导入/清空 ----------
@@ -1521,7 +1521,7 @@
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = '物品管家备份-' + todayStr() + '.json';
+    a.download = '小满备份-' + todayStr() + '.json';
     a.click();
     URL.revokeObjectURL(a.href);
     toast('备份已导出');

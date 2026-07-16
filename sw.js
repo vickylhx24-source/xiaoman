@@ -30,7 +30,7 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('message', (e) => {
   if (e.data && e.data.type === 'notify') {
     const d = e.data.payload || {};
-    self.registration.showNotification(d.title || '物品管家提醒', {
+    self.registration.showNotification(d.title || '小满提醒', {
       body: d.body || '',
       icon: './icon.svg',
       badge: './icon.svg',

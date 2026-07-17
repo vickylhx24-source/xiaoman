@@ -130,6 +130,15 @@
 
     // 菜谱与日历
     $('recipe-close').addEventListener('click', () => showSheet('sheet-recipe', false));
+    // 菜谱来源链接：确保能点开（补全协议 + 新窗口打开）
+    $('recipe-body').addEventListener('click', (e) => {
+      const a = e.target.closest('.recipe-src-link');
+      if (!a) return;
+      e.preventDefault();
+      const url = a.getAttribute('href');
+      const w = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!w) location.href = url;
+    });
     $('btn-cal').addEventListener('click', exportCalendar);
     $('home-cal-btn').addEventListener('click', () => { exportCalendar(); calDirty = false; renderHome(); });
     $('set-autocal').addEventListener('change', e => { state.settings.autoCal = e.target.checked; saveSetting('autoCal', e.target.checked); renderHome(); });
@@ -725,7 +734,11 @@
     '🍚 主食': ['饭', '面', '粉', '饼', '馒头', '包子', '饺子', '面包', '意面', '吐司', '粥', '米'],
     '🥚 蛋奶': ['鸡蛋', '蛋', '牛奶', '奶酪', '芝士', '奶油', '酸奶'],
     '🐟 水产': ['鱼', '虾', '蟹', '贝', '鱿鱼', '带鱼', '三文鱼', '鳕鱼', '海带', '紫菜', '虾皮'],
-    '🥩 肉荤': ['肉', '牛肉', '猪肉', '羊肉', '排骨', '里脊', '培根', '火腿', '香肠', '鸡肉', '鸡翅', '鸡', '鸭', '鹅', '兔'],
+    '🍗 鸡肉类': ['鸡肉', '鸡翅', '鸡腿', '鸡胸', '鸡丁', '鸡', '烤鸡', '炸鸡', '鸡爪', '鸡胗'],
+    '🐂 牛肉类': ['牛肉', '牛腩', '牛排', '牛柳', '肥牛', '卤牛', '牛', '牛肚', '牛筋'],
+    '🐑 羊肉类': ['羊肉', '羊排', '羊腿', '烤羊', '羊', '羊蝎子'],
+    '🐷 猪肉类': ['猪肉', '排骨', '里脊', '培根', '火腿', '香肠', '猪蹄', '五花肉', '叉烧', '肉', '肉丝', '肉末', '肉沫', '猪', '肘子'],
+    '🥩 其他肉荤': ['鸭', '鹅', '兔', '鹌鹑', '鸽子', '驴'],
     '🥤 饮品': ['饮', '汁', '奶昔', '咖啡', '茶'],
     '🥬 蔬菜': ['菜', '青菜', '西兰花', '菠菜', '白菜', '番茄', '土豆', '茄子', '黄瓜', '胡萝卜', '萝卜', '冬瓜', '南瓜', '玉米', '青椒', '洋葱', '韭菜', '芹菜', '生菜', '芦笋', '藕', '山药', '香菇', '豆腐', '豆', '豆芽']
   };
@@ -829,7 +842,11 @@
     const miss = ingNames.filter(n => !fridgeHas(n));
     const needText = ingNames.join('、') || '—';
     html += `<p class="recipe-needs">🥗 需要：${escapeHtml(needText)}</p>`;
-    if (r.source) html += `<p class="tip">🔗 <a href="${escapeHtml(r.source)}" target="_blank" rel="noopener">查看来源</a></p>`;
+    if (r.source) {
+      let su = String(r.source).trim();
+      if (!/^https?:\/\//i.test(su)) su = 'https://' + su;
+      html += `<p class="tip">🔗 <a class="recipe-src-link" href="${escapeHtml(su)}" target="_blank" rel="noopener noreferrer">查看来源</a></p>`;
+    }
     if (ingNames.length) {
       html += '<div class="rec-have">';
       if (have.length) html += `<span class="badge gray">✅ 已有 ${escapeHtml(have.join('、'))}</span>`;

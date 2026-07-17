@@ -165,6 +165,9 @@
     $('recipe-edit-cancel').addEventListener('click', () => showSheet('sheet-recipe-edit', false));
     $('recipe-edit-form').addEventListener('submit', onRecipeEditSubmit);
     $('r-imgs').addEventListener('change', onRecipeImages);
+    // 菜谱分类下拉（自动 + 各食材大类 + 其他），由 RECIPE_GROUPS 生成
+    $('r-cat').innerHTML = ['auto', ...Object.keys(RECIPE_GROUPS), '📦 其他']
+      .map(o => `<option value="${escapeHtml(o)}">${o === 'auto' ? '🤖 自动（按食材）' : escapeHtml(o)}</option>`).join('');
     $('recipe-link-cancel').addEventListener('click', () => showSheet('sheet-recipe-link', false));
     $('recipe-link-form').addEventListener('submit', onRecipeLinkSubmit);
     $('r-extract').addEventListener('click', smartExtract);
@@ -743,6 +746,7 @@
     '🥬 蔬菜': ['菜', '青菜', '西兰花', '菠菜', '白菜', '番茄', '土豆', '茄子', '黄瓜', '胡萝卜', '萝卜', '冬瓜', '南瓜', '玉米', '青椒', '洋葱', '韭菜', '芹菜', '生菜', '芦笋', '藕', '山药', '香菇', '豆腐', '豆', '豆芽']
   };
   function recipeGroup(r) {
+    if (r && r.category) return r.category; // 手动指定的分类优先
     const names = recipeIngredientNames(r);
     if (!names.length) return '📦 其他';
     for (const g in RECIPE_GROUPS) {
@@ -908,6 +912,7 @@
       $('r-ing').value = (r.ingredients || []).join('\n');
       $('r-steps').value = (r.steps || []).join('\n');
       $('r-tags').value = (r.tags || []).join(',');
+      $('r-cat').value = r.category || 'auto';
       editImages = (r.images || []).slice();
       renderEditImages();
       $('recipe-edit-del').style.display = 'block';
@@ -942,10 +947,12 @@
     const steps = $('r-steps').value.split('\n').map(s => s.trim()).filter(Boolean);
     const tags = $('r-tags').value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
     const source = $('r-source').value.trim();
+    const cat = $('r-cat').value;
     const id = $('recipe-edit-form').dataset.id;
     const rec = {
       id: id || ('rc-' + Date.now() + Math.random().toString(36).slice(2, 6)),
       name, source, ingredients, steps, tags, images: editImages.slice(),
+      category: cat && cat !== 'auto' ? cat : '',
       createdAt: Date.now(), updatedAt: Date.now()
     };
     await DB.putRecipe(rec);

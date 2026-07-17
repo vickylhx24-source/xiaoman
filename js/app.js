@@ -159,6 +159,26 @@
     $('recipe-link-cancel').addEventListener('click', () => showSheet('sheet-recipe-link', false));
     $('recipe-link-form').addEventListener('submit', onRecipeLinkSubmit);
     $('r-extract').addEventListener('click', smartExtract);
+
+    // 图片大图浏览（灯箱）控件
+    const iv = $('img-viewer');
+    iv.querySelector('.iv-close').addEventListener('click', () => showSheet('img-viewer', false));
+    iv.querySelector('.iv-backdrop').addEventListener('click', () => showSheet('img-viewer', false));
+    iv.querySelector('.iv-prev').addEventListener('click', () => viewerStep(-1));
+    iv.querySelector('.iv-next').addEventListener('click', () => viewerStep(1));
+    const ivImg = iv.querySelector('.iv-img');
+    let ivStartX = 0;
+    ivImg.addEventListener('touchstart', e => { ivStartX = e.touches[0].clientX; }, { passive: true });
+    ivImg.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - ivStartX;
+      if (Math.abs(dx) > 40) viewerStep(dx < 0 ? 1 : -1);
+    });
+    document.addEventListener('keydown', e => {
+      if (!iv.classList.contains('show')) return;
+      if (e.key === 'Escape') showSheet('img-viewer', false);
+      else if (e.key === 'ArrowLeft') viewerStep(-1);
+      else if (e.key === 'ArrowRight') viewerStep(1);
+    });
     $('set-proxy').addEventListener('change', e => { state.settings.recipeProxy = e.target.value.trim(); saveSetting('recipeProxy', state.settings.recipeProxy); });
     $('btn-stats').addEventListener('click', () => showView('stats'));
 
@@ -801,7 +821,8 @@
     $('recipe-title').textContent = (r.ico ? r.ico + ' ' : '🍲 ') + r.name;
     let html = '';
     if (r.images && r.images.length) {
-      html += '<div class="rec-imgs">' + r.images.map(src => `<img src="${src}" alt="">`).join('') + '</div>';
+      html += '<div class="rec-imgs">' + r.images.map((src, i) => `<img src="${src}" alt="" data-img-idx="${i}">`).join('') + '</div>';
+      html += `<p class="tip iv-hint">💡 点图片可放大浏览（共 ${r.images.length} 张）</p>`;
     }
     const ingNames = recipeIngredientNames(r);
     const have = ingNames.filter(n => fridgeHas(n));
@@ -822,11 +843,36 @@
     html += '<button id="rd-edit" class="block-btn outline">✏️ 编辑菜谱</button>';
     html += '<button id="rd-del" class="block-btn danger">🗑️ 删除菜谱</button>';
     $('recipe-body').innerHTML = html;
+    $('recipe-body').querySelectorAll('.rec-imgs img').forEach(img => {
+      img.addEventListener('click', () => openImageViewer(r.images, Number(img.dataset.imgIdx)));
+    });
     $('rd-buy').onclick = () => addRecipeToShopping(r);
     $('rd-eat').onclick = () => { showSheet('sheet-recipe', false); openNutriSheet(null, r.name); };
     $('rd-edit').onclick = () => { showSheet('sheet-recipe', false); openRecipeEdit(r.id); };
     $('rd-del').onclick = () => deleteRecipe(r.id);
     showSheet('sheet-recipe', true);
+  }
+
+  // ---------- 图片大图浏览（灯箱）----------
+  let viewerImgs = [], viewerIdx = 0;
+  function openImageViewer(imgs, idx) {
+    if (!imgs || !imgs.length) return;
+    viewerImgs = imgs; viewerIdx = idx || 0;
+    renderImageViewer();
+    showSheet('img-viewer', true);
+  }
+  function renderImageViewer() {
+    const v = $('img-viewer');
+    v.querySelector('.iv-img').src = viewerImgs[viewerIdx];
+    v.querySelector('.iv-count').textContent = (viewerIdx + 1) + ' / ' + viewerImgs.length;
+    const multi = viewerImgs.length > 1;
+    v.querySelector('.iv-prev').style.display = multi ? '' : 'none';
+    v.querySelector('.iv-next').style.display = multi ? '' : 'none';
+  }
+  function viewerStep(d) {
+    if (!viewerImgs.length) return;
+    viewerIdx = (viewerIdx + d + viewerImgs.length) % viewerImgs.length;
+    renderImageViewer();
   }
 
   // ---------- 保存 / 编辑菜谱（图片存 IndexedDB）----------

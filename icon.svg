@@ -1,8 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
-  <rect width="192" height="192" rx="40" fill="#2f7d4f"/>
-  <rect x="46" y="58" width="100" height="84" rx="12" fill="#ffffff"/>
-  <rect x="46" y="58" width="100" height="26" rx="12" fill="#bfe3cd"/>
-  <line x1="46" y1="120" x2="146" y2="120" stroke="#bfe3cd" stroke-width="6"/>
-  <circle cx="96" cy="100" r="14" fill="#2f7d4f"/>
-  <path d="M96 90 v20 M86 100 h20" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3bbf8c"/>
+      <stop offset="1" stop-color="#1c7a4d"/>
+    </linearGradient>
+    <radialGradient id="hl" cx="0.32" cy="0.26" r="0.85">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#hl)"/>
+  <g fill="#ffffff">
+    <!-- 麦秆 -->
+    <rect x="249.5" y="150" width="13" height="240" rx="6.5"/>
+    <!-- 麦穗：左右成对麦粒 -->
+    <ellipse cx="206" cy="345" rx="30" ry="56" transform="rotate(40 206 345)"/>
+    <ellipse cx="306" cy="345" rx="30" ry="56" transform="rotate(-40 306 345)"/>
+    <ellipse cx="209" cy="293" rx="30" ry="56" transform="rotate(40 209 293)"/>
+    <ellipse cx="303" cy="293" rx="30" ry="56" transform="rotate(-40 303 293)"/>
+    <ellipse cx="213" cy="241" rx="29" ry="54" transform="rotate(40 213 241)"/>
+    <ellipse cx="299" cy="241" rx="29" ry="54" transform="rotate(-40 299 241)"/>
+    <ellipse cx="220" cy="193" rx="27" ry="50" transform="rotate(40 220 193)"/>
+    <ellipse cx="292" cy="193" rx="27" ry="50" transform="rotate(-40 292 193)"/>
+    <ellipse cx="231" cy="152" rx="23" ry="44" transform="rotate(38 231 152)"/>
+    <ellipse cx="281" cy="152" rx="23" ry="44" transform="rotate(-38 281 152)"/>
+    <!-- 顶端麦粒 -->
+    <ellipse cx="256" cy="126" rx="21" ry="42"/>
+  </g>
 </svg>
